@@ -25,24 +25,16 @@ function showOrderMenu() {
     document.getElementById("orderMenu").classList.remove("hidden");
 }
 
-function confirmOrder() {
+async function confirmOrder(){
     document.getElementById("orderMessage").innerText = "Preparazione delle pizze in corso...";
     document.getElementById("orderMenu").classList.add("hidden");
-
-    let racePromises = selectedPizzas.map((pizza) => {
-        return orderPizza(pizza)
-            .then(() => {
-                return pizza; 
-            });
-    });
-
-    Promise.race(racePromises)
-        .then((winnerPizza) => {
-            updateOrderMessage(`La pizza ${winnerPizza} è stata completata per prima!`);
-        })
-        .catch((error) => {
-            updateOrderMessage(`Errore nella preparazione della pizza: ${error}`);
-        });
+    try {
+        const racePromises = selectedPizzas.map((pizza) => orderPizza(pizza).then(() => pizza));
+        const winnerPizza = await Promise.race(racePromises);
+        updateOrderMessage(`La pizza ${winnerPizza} è stata completata per prima!`);
+    } catch (error) {
+        updateOrderMessage(`Errore nella preparazione della pizza: ${error}`);
+    }
 }
 
 function cancelOrder() {
@@ -51,7 +43,7 @@ function cancelOrder() {
     document.getElementById("orderMessage").innerText = "Ordine annullato.";
 }
 
-function orderPizza(pizza) {
+async function orderPizza(pizza){
     let currentState = 'impastamento';
 
     const updateState = (state) => {
@@ -66,62 +58,54 @@ function orderPizza(pizza) {
                 updateState(state);
                 resolve();
             }, randomDelay);
-        });
+        });        
     };
 
     const states = {
-        impastamento: () => transitionTo('condimento'),
-        condimento: () => transitionTo('forno'),
-        forno: () => {
+        impastamento: async () => await transitionTo('condimento'),
+        condimento: async () => await transitionTo('forno'),
+        forno: async () => {
             let success = Math.random() > 0.2;
             if (success) {
-                return transitionTo('pronta');
+                await transitionTo('pronta');
             } else {
-                return transitionTo('bruciata');
+                await transitionTo('bruciata');
             }
         }
     };
 
-    // const obj1 = {
-    //     firstname: "Ciccio", 
-    //     lastname: "Pasticcio",
-    //     "bad property": "pessimo nome per una proprietà"
-    // };
-    // const n = obj1.firstname;
-    // const n1 = obj1["firstname"];
-    // const n2 = obj1["bad property"];
-    // let propertyName = "lastname";
-    // const n3 = obj1[propertyName];
-    // propertyName = "firstname";
-    // const n4 = obj1[propertyName];
-
     const nextState = () => {
         const nextStateFunction = states[currentState];
-        if (nextStateFunction) {
+        if (nextStateFunction){
             return nextStateFunction();
         }
         return Promise.reject(`Errore: Stato sconosciuto ${currentState}`);
     };
 
-    const runStateMachine = () => {
-        return nextState().then(() => {
-            if (!(currentState === 'pronta' || currentState === 'bruciata')) {
-                return runStateMachine();
-            }
-        });
+    const runStateMachine = async () => {
+        await nextState();
+        if (!(currentState === 'pronta' || currentState === 'bruciata')) {
+                await runStateMachine();  
+        };
     };
 
     updateState('impastamento');
-    return runStateMachine().then(() => {
-        if (currentState === 'pronta') {
-            updateOrderMessage(`La pizza ${pizza} è pronta!`);
-        } else if (currentState === 'bruciata') {
-            updateOrderMessage(`La pizza ${pizza} è stata bruciata da gino!`);
-        }
-    });
+    await runStateMachine();
+    if (currentState === 'pronta'){
+        updateOrderMessage(`La pizza ${pizza} è pronta!`);
+    } else if (currentState === 'bruciata') {
+        updateOrderMessage(`La pizza ${pizza} è stata bruciata da gino!`);
+    }
+
 }
 
 function updateOrderMessage(message) {
     const orderMessage = document.getElementById("orderMessage");
     orderMessage.innerText += `\n${message}`;
 }
+
+
+
+
+
+
